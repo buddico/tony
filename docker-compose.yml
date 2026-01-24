@@ -1,0 +1,14 @@
+version: "3.8"
+
+services:
+  tony:
+    build:
+      context: .
+      args:
+        - GEMINI_API_KEY=${GEMINI_API_KEY}
+    container_name: tony
+    restart: unless-stopped
+    ports:
+      - "3100:80"
+    environment:
+      - TZ=Europe/London
