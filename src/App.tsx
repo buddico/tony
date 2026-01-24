@@ -5,6 +5,14 @@ import { createPcmBlob, decodeAudioData } from './utils/audio';
 import { AgentState, RoutingResultArgs, RoutingToolDeclaration } from './types';
 import { AudioVisualizer } from './components/AudioVisualizer';
 import { RoutingCard } from './components/RoutingCard';
+import {
+  checkBrowserCompatibility,
+  createAudioContext,
+  resumeAudioContext,
+  getMediaStream,
+  getCompatibilityHelp,
+  getBrowserName
+} from './utils/browser-compat';
 
 // API key is injected at build time by Vite's define
 const GEMINI_API_KEY: string = process.env.GEMINI_API_KEY as unknown as string;
@@ -16,6 +24,16 @@ export default function App() {
   const [routingResult, setRoutingResult] = useState<RoutingResultArgs | null>(null);
   const [transcript, setTranscript] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [browserInfo, setBrowserInfo] = useState<{ supported: boolean; help: string } | null>(null);
+
+  // Check browser compatibility on mount
+  useEffect(() => {
+    const compat = checkBrowserCompatibility();
+    setBrowserInfo({
+      supported: compat.supported,
+      help: getCompatibilityHelp()
+    });
+  }, []);
 
   // Refs for Audio handling
   const inputAudioContextRef = useRef<AudioContext | null>(null);
@@ -74,21 +92,36 @@ export default function App() {
       return;
     }
 
+    // Check browser compatibility
+    const compat = checkBrowserCompatibility();
+    if (!compat.supported) {
+      setError(`Browser not supported: ${compat.issues.join(', ')}. ${getCompatibilityHelp()}`);
+      return;
+    }
+
     try {
       setState(AgentState.PROCESSING); // Show "Please hold" while connecting
       setRoutingResult(null);
       setTranscript('');
       setError(null);
 
-      // 1. Setup Audio Contexts
-      inputAudioContextRef.current = new AudioContext({ sampleRate: 16000 });
-      outputAudioContextRef.current = new AudioContext({ sampleRate: 24000 });
+      // 1. Setup Audio Contexts (with browser compatibility)
+      inputAudioContextRef.current = createAudioContext(16000);
+      outputAudioContextRef.current = createAudioContext(24000);
+
+      if (!inputAudioContextRef.current || !outputAudioContextRef.current) {
+        throw new Error('Failed to create audio context. Please try a different browser.');
+      }
+
+      // Resume audio contexts (required for iOS Safari and some mobile browsers)
+      await resumeAudioContext(inputAudioContextRef.current);
+      await resumeAudioContext(outputAudioContextRef.current);
 
       // 2. Setup GenAI Client
       const ai = new GoogleGenAI({ apiKey });
 
-      // 3. Get Mic Stream
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // 3. Get Mic Stream (with browser compatibility)
+      const stream = await getMediaStream();
       mediaStreamRef.current = stream;
 
       // 4. Connect Live API
@@ -206,7 +239,19 @@ export default function App() {
 
     } catch (err) {
       console.error("Failed to start session", err);
-      setError(err instanceof Error ? err.message : 'Failed to start session');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to start session';
+
+      // Provide helpful error messages for common issues
+      if (errorMessage.includes('Permission denied') || errorMessage.includes('NotAllowedError')) {
+        setError('Microphone access denied. Please allow microphone access and try again.');
+      } else if (errorMessage.includes('NotFoundError') || errorMessage.includes('no audio input')) {
+        setError('No microphone found. Please connect a microphone and try again.');
+      } else if (errorMessage.includes('NotReadableError')) {
+        setError('Microphone is in use by another application. Please close other apps using the microphone.');
+      } else {
+        setError(`${errorMessage}. ${getCompatibilityHelp()}`);
+      }
+
       setState(AgentState.ERROR);
     }
   };
@@ -256,6 +301,13 @@ export default function App() {
             <pre className="mt-2 bg-yellow-100 p-2 rounded text-sm">
               GEMINI_API_KEY=your_api_key_here
             </pre>
+          </div>
+        )}
+
+        {/* Browser Compatibility Warning */}
+        {browserInfo && !browserInfo.supported && (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 text-orange-800">
+            <strong>Browser Compatibility:</strong> {browserInfo.help}
           </div>
         )}
 
@@ -340,6 +392,9 @@ export default function App() {
             <li>Answer Tony's questions about your symptoms</li>
             <li>The triage result will appear once complete</li>
           </ol>
+          <p className="mt-3 text-xs text-blue-600">
+            Supported browsers: Chrome, Firefox, Safari, Edge (desktop and mobile). Requires HTTPS and microphone access.
+          </p>
         </div>
       </main>
 
