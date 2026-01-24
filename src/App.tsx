@@ -121,7 +121,7 @@ export default function App() {
           },
           onmessage: async (message: LiveServerMessage) => {
             // Handle Tool Calling (Routing Result)
-            if (message.toolCall) {
+            if (message.toolCall?.functionCalls) {
               console.log("Tool call received", message.toolCall);
               for (const fc of message.toolCall.functionCalls) {
                 if (fc.name === RoutingToolDeclaration.name) {
