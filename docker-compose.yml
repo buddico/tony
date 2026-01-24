@@ -9,6 +9,7 @@ services:
     container_name: tony
     restart: unless-stopped
     ports:
-      - "3100:80"
+      - "3101:80"
+    network_mode: bridge
     environment:
       - TZ=Europe/London
