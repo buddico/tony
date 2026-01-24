@@ -10,8 +10,7 @@ import {
   createAudioContext,
   resumeAudioContext,
   getMediaStream,
-  getCompatibilityHelp,
-  getBrowserName
+  getCompatibilityHelp
 } from './utils/browser-compat';
 
 // API key is injected at build time by Vite's define

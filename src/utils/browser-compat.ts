@@ -83,12 +83,20 @@ export async function getMediaStream(): Promise<MediaStream> {
     });
   }
 
-  // Legacy API fallback
-  const legacyGetUserMedia = (
-    (navigator as Navigator & { webkitGetUserMedia?: typeof navigator.mediaDevices.getUserMedia }).webkitGetUserMedia ||
-    (navigator as Navigator & { mozGetUserMedia?: typeof navigator.mediaDevices.getUserMedia }).mozGetUserMedia ||
-    (navigator as Navigator & { msGetUserMedia?: typeof navigator.mediaDevices.getUserMedia }).msGetUserMedia
-  );
+  // Legacy API fallback (for very old browsers - rarely needed now)
+  type LegacyGetUserMedia = (
+    constraints: MediaStreamConstraints,
+    success: (stream: MediaStream) => void,
+    error: (err: Error) => void
+  ) => void;
+
+  const nav = navigator as Navigator & {
+    webkitGetUserMedia?: LegacyGetUserMedia;
+    mozGetUserMedia?: LegacyGetUserMedia;
+    msGetUserMedia?: LegacyGetUserMedia;
+  };
+
+  const legacyGetUserMedia = nav.webkitGetUserMedia || nav.mozGetUserMedia || nav.msGetUserMedia;
 
   if (legacyGetUserMedia) {
     return new Promise((resolve, reject) => {
