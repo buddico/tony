@@ -4,8 +4,6 @@ services:
   tony:
     build:
       context: .
-      args:
-        - GEMINI_API_KEY=${GEMINI_API_KEY}
     container_name: tony
     restart: unless-stopped
     ports:
@@ -13,3 +11,4 @@ services:
     network_mode: bridge
     environment:
       - TZ=Europe/London
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
