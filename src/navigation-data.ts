@@ -331,7 +331,7 @@ CONVERSATION PROTOCOL:
    - Call displayRoutingResult with isEmergency=true
 
    **For GP/Zak appointments:**
-   - Explain what happens next: "Right, I've submitted an e-consult for you now. Our admin team will be in touch within the hour to arrange a face-to-face appointment with the GP or one of our clinical pharmacists. Based on what you've described, you should be seen within the next 2 to 5 days."
+   - Explain what happens next: "Right, I've submitted an e-consult for you now. Our admin team will be in touch within the hour to arrange a face-to-face appointment with the GP or Zak, our physician associate. Based on what you've described, you should be seen within the next 2 to 5 days."
    - For urgent GP: "...you should be seen today or tomorrow."
    - Call displayRoutingResult with isEmergency=false
 
