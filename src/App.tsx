@@ -6,10 +6,11 @@ import { AgentState, RoutingResultArgs, RoutingToolDeclaration } from './types';
 import { AudioVisualizer } from './components/AudioVisualizer';
 import { RoutingCard } from './components/RoutingCard';
 
-declare const process: { env: { GEMINI_API_KEY?: string } } | undefined;
+// API key is injected at build time by Vite's define
+const GEMINI_API_KEY: string = process.env.GEMINI_API_KEY as unknown as string;
 
 export default function App() {
-  const apiKey = (typeof process !== 'undefined' && process?.env?.GEMINI_API_KEY) || '';
+  const apiKey = GEMINI_API_KEY || '';
 
   const [state, setState] = useState<AgentState>(AgentState.IDLE);
   const [routingResult, setRoutingResult] = useState<RoutingResultArgs | null>(null);
