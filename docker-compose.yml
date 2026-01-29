@@ -11,4 +11,8 @@ services:
     network_mode: bridge
     environment:
       - TZ=Europe/London
+      # Use ONE of these modes:
+      # Option 1: Gemini (cloud) - 55 day data retention
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      # Option 2: Local AI (Mac Studio) - zero data retention
+      # - LOCAL_AI_URL=ws://192.168.0.55:3001/api/live

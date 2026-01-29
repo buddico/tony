@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  tony:
+    build:
+      context: .
+    container_name: tony
+    restart: unless-stopped
+    ports:
+      - "3101:80"
+    network_mode: bridge
+    environment:
+      - TZ=Europe/London
+      # Local AI mode - zero data retention
+      - LOCAL_AI_URL=ws://192.168.0.55:3001/api/live

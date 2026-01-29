@@ -22,8 +22,8 @@ export function RoutingCard({ result }: RoutingCardProps) {
               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
             />
           </svg>
-          <p className="text-sm">Routing result will appear here</p>
-          <p className="text-xs mt-1">Complete the triage conversation</p>
+          <p className="text-sm font-medium">e-Consult will be created here</p>
+          <p className="text-xs mt-1 text-slate-500">Complete the call with Tony to generate your request</p>
         </div>
       </div>
     );
@@ -42,7 +42,7 @@ export function RoutingCard({ result }: RoutingCardProps) {
       {/* Header */}
       <div className="flex items-center gap-3 mb-4">
         {isEmergency ? (
-          <div className="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center animate-pulse">
             <svg
               className="w-6 h-6 text-white"
               fill="none"
@@ -80,10 +80,27 @@ export function RoutingCard({ result }: RoutingCardProps) {
               isEmergency ? 'text-red-700' : 'text-emerald-700'
             }`}
           >
-            {isEmergency ? 'URGENT - Emergency Routing' : 'Triage Complete'}
+            {isEmergency ? 'URGENT ESCALATION' : 'e-Consult Created'}
           </h3>
-          <p className="text-sm text-slate-600">Routing decision made</p>
+          <p className="text-sm text-slate-600">
+            {isEmergency ? 'Clinical staff notified immediately' : 'Admin will respond within 1 hour'}
+          </p>
         </div>
+      </div>
+
+      {/* Next Steps Banner */}
+      <div className={`rounded-lg p-3 mb-4 ${isEmergency ? 'bg-red-100' : 'bg-emerald-100'}`}>
+        <p className={`text-sm font-medium ${isEmergency ? 'text-red-800' : 'text-emerald-800'}`}>
+          {isEmergency ? (
+            <>
+              <span className="font-bold">What happens next:</span> A clinician will call you back urgently. Please keep your phone nearby.
+            </>
+          ) : (
+            <>
+              <span className="font-bold">What happens next:</span> Our admin team will review your request and respond within 1 hour during working hours (Mon-Fri, 8am-6pm).
+            </>
+          )}
+        </p>
       </div>
 
       {/* Details */}

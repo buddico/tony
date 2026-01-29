@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  tony:
+    build:
+      context: .
+    container_name: tony
+    restart: unless-stopped
+    ports:
+      - "3101:80"
+    network_mode: bridge
+    environment:
+      - TZ=Europe/London
+      # Vertex AI mode - zero data retention
+      - USE_VERTEX_AI=true
+      - VERTEX_PROJECT=big-depth-420810
+      - VERTEX_LOCATION=us-central1
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/server/credentials.json

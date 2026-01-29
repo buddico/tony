@@ -3,3 +3,9 @@ dist/
 .env.local
 .DS_Store
 *.log
+
+# Google Cloud credentials - NEVER commit these
+server/credentials.json
+credentials.json
+*.credentials.json
+*-serviceaccount.json

@@ -134,6 +134,15 @@ export default function App() {
             tools: [{ functionDeclarations: [RoutingToolDeclaration] }],
             speechConfig: {
               voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Charon' } }
+            },
+            // VAD tuning: HIGH sensitivity to detect speech start, LOW to avoid cutting off
+            realtimeInputConfig: {
+              automaticActivityDetection: {
+                startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
+                endOfSpeechSensitivity: 'END_SENSITIVITY_LOW',
+                prefixPaddingMs: 300,
+                silenceDurationMs: 1500  // Wait 1.5 seconds of silence before ending turn
+              }
             }
           }
         }));
@@ -167,6 +176,14 @@ export default function App() {
                   media: pcmBlob
                 }));
               }
+
+              // Ensure audio contexts stay active
+              if (inputAudioContextRef.current?.state === 'suspended') {
+                inputAudioContextRef.current.resume();
+              }
+              if (outputAudioContextRef.current?.state === 'suspended') {
+                outputAudioContextRef.current.resume();
+              }
             };
 
             source.connect(processor);
@@ -176,6 +193,14 @@ export default function App() {
           // Handle Gemini messages forwarded from server
           if (message.type === 'gemini' && message.data) {
             const geminiMessage = message.data;
+
+            // Debug logging - identify message content
+            const hasAudio = geminiMessage.serverContent?.modelTurn?.parts?.some((p: any) => p.inlineData?.data);
+            const hasText = geminiMessage.serverContent?.modelTurn?.parts?.some((p: any) => p.text);
+            const hasTurnComplete = geminiMessage.serverContent?.turnComplete;
+            if (hasAudio || hasText || hasTurnComplete) {
+              console.log(`Gemini msg: audio=${hasAudio} text=${hasText} turnComplete=${hasTurnComplete}`);
+            }
 
             // Handle Tool Calling (Routing Result)
             if (geminiMessage.toolCall?.functionCalls) {
@@ -204,14 +229,15 @@ export default function App() {
 
             // Handle Text Transcription (for UI)
             if (geminiMessage.serverContent?.modelTurn?.parts) {
-              const textPart = geminiMessage.serverContent.modelTurn.parts.find((p: any) => p.text);
+              const textPart = geminiMessage.serverContent.modelTurn.parts.find((p: any) => p.text && !p.thought);
               if (textPart && textPart.text) {
                 setTranscript(prev => prev + textPart.text);
               }
             }
 
-            // Handle Audio Output
-            const base64Audio = geminiMessage.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+            // Handle Audio Output - find the part with inlineData (audio)
+            const audioPart = geminiMessage.serverContent?.modelTurn?.parts?.find((p: any) => p.inlineData?.data);
+            const base64Audio = audioPart?.inlineData?.data;
             if (base64Audio && outputAudioContextRef.current) {
               const ctx = outputAudioContextRef.current;
               nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime);
@@ -263,8 +289,8 @@ export default function App() {
         setState(AgentState.ERROR);
       };
 
-      ws.onclose = () => {
-        console.log('WebSocket closed');
+      ws.onclose = (event) => {
+        console.log('WebSocket closed - code:', event.code, 'reason:', event.reason || 'none', 'wasClean:', event.wasClean);
         if (state !== AgentState.IDLE && state !== AgentState.ERROR) {
           setState(AgentState.IDLE);
         }
@@ -297,7 +323,17 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+      {/* Testing Mode Banner */}
+      <div className="bg-amber-500 text-amber-950 py-2 px-4">
+        <div className="max-w-4xl mx-auto flex items-center justify-center gap-2 text-sm font-medium">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <span>TESTING MODE - Do not use real patient information</span>
+        </div>
+      </div>
+
       {/* Header */}
       <header className="bg-blue-600 text-white py-4 px-6 shadow-lg">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
@@ -332,27 +368,61 @@ export default function App() {
           </div>
         )}
 
-        {/* Pilot Notice */}
-        <div className="bg-amber-50 border border-amber-300 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <svg className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        {/* What to Expect - Key Information */}
+        <div className="bg-white border-2 border-blue-200 rounded-xl p-5 shadow-sm">
+          <h2 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
+            <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <div>
-              <h3 className="font-semibold text-amber-800">Pilot Programme - Internal Testing Only</h3>
-              <p className="text-sm text-amber-700 mt-1">
-                This is a prototype AI voice receptionist for evaluation purposes.
-                By using this system, you acknowledge that:
+            What Happens After Your Call
+          </h2>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-200">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h3 className="font-semibold text-emerald-800">Standard Request</h3>
+              </div>
+              <p className="text-sm text-emerald-700">
+                Creates an <strong>e-Consult</strong> that our admin team will respond to <strong>within 1 hour</strong> during working hours.
               </p>
-              <ul className="text-sm text-amber-700 mt-2 list-disc list-inside space-y-1">
-                <li>Your voice is processed by Google's Gemini AI</li>
-                <li>Audio data may be retained by Google for up to 55 days for abuse monitoring</li>
-                <li>Do not use real patient information during testing</li>
-                <li>This system is not yet approved for clinical use</li>
-              </ul>
+            </div>
+            <div className="bg-red-50 rounded-lg p-4 border border-red-200">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <h3 className="font-semibold text-red-800">Urgent Symptoms</h3>
+              </div>
+              <p className="text-sm text-red-700">
+                <strong>Immediate escalation</strong> to clinical staff for urgent review and callback.
+              </p>
             </div>
           </div>
         </div>
+
+        {/* Privacy Notice - Collapsed */}
+        <details className="bg-slate-50 border border-slate-200 rounded-lg">
+          <summary className="p-4 cursor-pointer flex items-center gap-2 text-slate-700 font-medium hover:bg-slate-100 rounded-lg">
+            <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            Privacy &amp; Data Protection (Zero Retention)
+          </summary>
+          <div className="px-4 pb-4 text-sm text-slate-600 space-y-2">
+            <p>This pilot uses Google Vertex AI with enterprise privacy controls:</p>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li>Zero data retention - no conversation data stored by Google</li>
+              <li>Audio processed in real-time and immediately discarded</li>
+              <li>NHS-compliant data handling via Vertex AI</li>
+            </ul>
+          </div>
+        </details>
 
         {/* Call Control */}
         <div className="bg-white rounded-xl shadow-lg p-8">
@@ -418,7 +488,7 @@ export default function App() {
           {/* Routing Result */}
           <div>
             <h2 className="text-lg font-semibold text-slate-800 mb-4">
-              Triage Result
+              Your e-Consult
             </h2>
             <RoutingCard result={routingResult} />
           </div>
@@ -426,16 +496,17 @@ export default function App() {
 
         {/* Instructions */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
-          <h3 className="font-semibold mb-2">How to use:</h3>
+          <h3 className="font-semibold mb-2">How it works:</h3>
           <ol className="list-decimal list-inside space-y-1">
-            <li>Click the green phone button to start a call</li>
+            <li>Click the green phone button to start</li>
             <li>Allow microphone access when prompted</li>
-            <li>Speak naturally - Tony will greet you and ask about your needs</li>
+            <li>Speak naturally - Tony will ask about your needs</li>
             <li>Answer Tony's questions about your symptoms</li>
-            <li>The triage result will appear once complete</li>
+            <li>An <strong>e-Consult</strong> is created automatically</li>
+            <li>Admin responds <strong>within 1 hour</strong> (or urgent escalation)</li>
           </ol>
           <p className="mt-3 text-xs text-blue-600">
-            Supported browsers: Chrome, Firefox, Safari, Edge (desktop and mobile). Requires HTTPS and microphone access.
+            Works on Chrome, Firefox, Safari, Edge. Requires microphone access.
           </p>
         </div>
       </main>

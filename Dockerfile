@@ -50,6 +50,9 @@ COPY --from=backend-builder /app/server/dist ./dist
 COPY --from=backend-builder /app/server/node_modules ./node_modules
 COPY --from=backend-builder /app/server/package.json ./
 
+# Copy Vertex AI credentials (if exists)
+COPY server/credentials.json ./credentials.json
+
 # Copy startup script
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
