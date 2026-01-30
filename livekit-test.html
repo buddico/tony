@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tony LiveKit Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.js"></script>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; }
+        button { padding: 15px 30px; font-size: 18px; cursor: pointer; margin: 10px; }
+        #status { margin: 20px 0; padding: 10px; background: #f0f0f0; }
+        #connect { background: #4CAF50; color: white; border: none; border-radius: 5px; }
+        #disconnect { background: #f44336; color: white; border: none; border-radius: 5px; }
+        .connected { background: #d4edda !important; }
+        .error { background: #f8d7da !important; }
+    </style>
+</head>
+<body>
+    <h1>Tony - LiveKit Local AI Test</h1>
+    <p>Testing connection to Mac Studio LiveKit server</p>
+
+    <div>
+        <button id="connect" onclick="connect()">Connect & Start Call</button>
+        <button id="disconnect" onclick="disconnect()" disabled>End Call</button>
+    </div>
+
+    <div id="status">Status: Ready</div>
+    <div id="transcript"></div>
+
+    <script>
+        const LIVEKIT_URL = 'ws://192.168.0.55:7880';
+        const TOKEN_URL = 'http://192.168.0.55:7882/token';
+
+        let room = null;
+
+        function log(msg, isError = false) {
+            const status = document.getElementById('status');
+            status.textContent = 'Status: ' + msg;
+            status.className = isError ? 'error' : (msg.includes('Connected') ? 'connected' : '');
+            console.log(msg);
+        }
+
+        async function connect() {
+            try {
+                log('Fetching token...');
+                const tokenRes = await fetch(TOKEN_URL);
+                const { token, url } = await tokenRes.json();
+
+                log('Connecting to LiveKit...');
+                room = new LivekitClient.Room({
+                    adaptiveStream: true,
+                    dynacast: true,
+                });
+
+                room.on(LivekitClient.RoomEvent.Connected, () => {
+                    log('Connected to room!');
+                    document.getElementById('connect').disabled = true;
+                    document.getElementById('disconnect').disabled = false;
+                });
+
+                room.on(LivekitClient.RoomEvent.Disconnected, () => {
+                    log('Disconnected');
+                    document.getElementById('connect').disabled = false;
+                    document.getElementById('disconnect').disabled = true;
+                });
+
+                room.on(LivekitClient.RoomEvent.ParticipantConnected, (participant) => {
+                    log('Agent joined: ' + participant.identity);
+                });
+
+                room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+                    if (track.kind === 'audio') {
+                        log('Receiving agent audio');
+                        const audio = track.attach();
+                        document.body.appendChild(audio);
+                        audio.play();
+                    }
+                });
+
+                room.on(LivekitClient.RoomEvent.DataReceived, (data, participant) => {
+                    const text = new TextDecoder().decode(data);
+                    document.getElementById('transcript').innerHTML += '<p>' + text + '</p>';
+                });
+
+                await room.connect(url || LIVEKIT_URL, token);
+
+                // Enable microphone
+                log('Enabling microphone...');
+                await room.localParticipant.setMicrophoneEnabled(true);
+                log('Connected - Speak to Tony!');
+
+            } catch (err) {
+                log('Error: ' + err.message, true);
+                console.error(err);
+            }
+        }
+
+        async function disconnect() {
+            if (room) {
+                await room.disconnect();
+                room = null;
+            }
+            log('Disconnected');
+            document.getElementById('connect').disabled = false;
+            document.getElementById('disconnect').disabled = true;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+livekit-agents>=1.3.12
+livekit-plugins-openai
+livekit-plugins-silero
+faster-whisper
+piper-tts
+numpy
